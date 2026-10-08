@@ -1,0 +1,23 @@
+services:
+  android:
+    build:
+      context: docker
+      # The Docker bridge network has no outbound access on this host; build on the host network.
+      network: host
+      args:
+        UID: "${HOST_UID:-1000}"
+        GID: "${HOST_GID:-1000}"
+    image: tubebeam-build:latest
+    # Host networking lets adb inside the container talk to the host's adb server
+    # (the phone is plugged into the host), so `./gw installDebug` works.
+    network_mode: host
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - gradle-cache:/home/dev/.gradle
+    environment:
+      - ANDROID_SERIAL
+      - ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
+
+volumes:
+  gradle-cache:

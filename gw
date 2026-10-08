@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runs the Gradle wrapper inside the build container.  Example: ./gw assembleDebug
+# Any non-Gradle command can be run with:  ./gw --sh <command...>
+set -euo pipefail
+cd "$(dirname "$0")"
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+if [[ "${1:-}" == "--sh" ]]; then
+  shift
+  exec docker compose run --rm android "${@:-bash}"
+fi
+exec docker compose run --rm android ./gradlew "$@"
