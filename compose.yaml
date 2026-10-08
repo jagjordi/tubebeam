@@ -18,6 +18,11 @@ services:
     environment:
       - ANDROID_SERIAL
       - ADB_SERVER_SOCKET=tcp:127.0.0.1:5037
+      # Release signing (optional; see .env.release.example)
+      - TUBEBEAM_KEYSTORE
+      - TUBEBEAM_KEYSTORE_PASSWORD
+      - TUBEBEAM_KEY_ALIAS
+      - TUBEBEAM_KEY_PASSWORD
 
 volumes:
   gradle-cache:

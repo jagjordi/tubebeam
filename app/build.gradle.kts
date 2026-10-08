@@ -13,8 +13,9 @@ android {
         applicationId = "dev.tubebeam"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        // CI passes -PversionName=<tag> -PversionCode=<run number> for releases.
+        versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (project.findProperty("versionName") as String?) ?: "0.1.0"
     }
 
     signingConfigs {
@@ -28,11 +29,23 @@ android {
         }
     }
 
+    // Release signing comes from the environment (CI secrets or a local shell); unsigned otherwise.
+    val releaseKeystore = System.getenv("TUBEBEAM_KEYSTORE")?.let(rootProject::file)?.takeIf { it.exists() }
+    if (releaseKeystore != null) {
+        signingConfigs.create("release") {
+            storeFile = releaseKeystore
+            storePassword = System.getenv("TUBEBEAM_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("TUBEBEAM_KEY_ALIAS") ?: "tubebeam"
+            keyPassword = System.getenv("TUBEBEAM_KEY_PASSWORD") ?: System.getenv("TUBEBEAM_KEYSTORE_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

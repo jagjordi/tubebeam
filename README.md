@@ -1,5 +1,8 @@
 # TubeBeam
 
+[![CI](https://github.com/jagjordi/tubebeam/actions/workflows/ci.yml/badge.svg)](https://github.com/jagjordi/tubebeam/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jagjordi/tubebeam?include_prereleases)](https://github.com/jagjordi/tubebeam/releases/latest)
+
 Share a YouTube link from your phone and it plays in **[SmartTube](https://github.com/yuliskov/SmartTube)** on your Android TV. No casting, no remote-control pairing, and the TV wakes up and launches SmartTube by itself.
 
 TubeBeam is an Android phone app that appears in the system **Share** sheet as "Send to TV". Share a video from the YouTube app, Chrome, YouTube Music, Shorts, or anywhere else, and it opens on the TV. With one TV it just sends; with several, a small floating picker lets you choose.
@@ -16,6 +19,10 @@ am start -a android.intent.action.VIEW -d 'https://www.youtube.com/watch?v=VIDEO
 SmartTube receives the VIEW intent and plays the video. As a side effect this also wakes the TV and launches SmartTube if it was closed, which plain casting cannot do.
 
 The phone identifies itself with an RSA key. The first time you connect, the TV shows its usual **"Allow USB debugging?"** prompt with the key fingerprint; tick *Always allow from this computer* once and the TV trusts the phone from then on. The app shows the same fingerprint so you can compare.
+
+## Install
+
+Download the APK from the [latest release](https://github.com/jagjordi/tubebeam/releases/latest) on your phone and open it. Android 8.0 or newer.
 
 ## TV setup (once per TV)
 
@@ -41,7 +48,7 @@ Detected player packages, in order of preference: `com.liskovsoft.smarttubetv.be
 
 ## Building
 
-Everything (JDK, Android SDK, Gradle) runs in a Docker container; nothing needs to be installed on the host besides Docker.
+Everything (JDK, Android SDK, Gradle) runs in a Docker container; nothing needs to be installed on the host besides Docker. CI builds every push; pushing a `v*` tag publishes a signed release APK (see `.github/workflows/release.yml`, signing via repository secrets, local setup in `.env.release.example`).
 
 ```
 docker compose build          # once
