@@ -63,3 +63,7 @@ docker compose build          # once
 ## Credits
 
 [SmartTube](https://github.com/yuliskov/SmartTube) by yuliskov and contributors, and [Kadb](https://github.com/flyfishxu/Kadb) by flyfishxu.
+
+## License
+
+[MIT](LICENSE)
