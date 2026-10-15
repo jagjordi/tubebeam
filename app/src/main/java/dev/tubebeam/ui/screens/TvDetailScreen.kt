@@ -45,6 +45,10 @@ import androidx.lifecycle.viewModelScope
 import dev.tubebeam.AppContainer
 import dev.tubebeam.adb.AdbError
 import dev.tubebeam.data.TvDevice
+import dev.tubebeam.discovery.FindPhase
+import dev.tubebeam.discovery.FindResult
+import dev.tubebeam.discovery.TvIdentity
+import dev.tubebeam.send.SendProgress
 import dev.tubebeam.send.SendResult
 import dev.tubebeam.youtube.TargetApp
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -121,7 +125,31 @@ class TvDetailViewModel(private val container: AppContainer, private val tvId: L
     fun testConnection() = runAction("Testing…") { tv ->
         container.adb.connect(tv.host, tv.port).use { s ->
             val model = s.shell("getprop ro.product.model").stdout.trim()
+            if (tv.serial == null) {
+                // Older records have no identity yet; learn it so the TV can be found after an IP change.
+                container.repo.rememberSerial(tv.id, TvIdentity.parse(s.shell(TvIdentity.COMMAND).stdout))
+            }
             "Connected. Device: $model"
+        }
+    }
+
+    /** Searches the LAN for this TV by identity and saves the address it answers from. */
+    fun locate() = runAction("Looking for the TV on the network…") { tv ->
+        when (val r = container.finder.find(tv, onPhase = { phase ->
+            val text = when (phase) {
+                FindPhase.MDNS -> "Asking the network who's there…"
+                FindPhase.SWEEP -> "Scanning the subnet for ADB…"
+                FindPhase.VERIFY -> "Checking candidates…"
+            }
+            _state.update { it.copy(status = text) }
+        })) {
+            is FindResult.Found -> {
+                container.repo.updateHost(tv.id, r.host)
+                _state.update { it.copy(host = r.host) }
+                "Found at ${r.host}. Address updated."
+            }
+            FindResult.NotFound -> "Not found. Is the TV on and on this Wi-Fi? (${TvIdentity.display(tv.serial)})"
+            FindResult.NoIdentity -> "This TV's ID isn't recorded yet. Tap Test while it is reachable, then try again."
         }
     }
 
@@ -143,7 +171,15 @@ class TvDetailViewModel(private val container: AppContainer, private val tvId: L
     }
 
     fun sendTestVideo() = runAction("Sending…") { tv ->
-        when (val r = container.sendCoordinator.send(tv, AddTvViewModel.TEST_VIDEO_URL)) {
+        val onProgress: (SendProgress) -> Unit = { p ->
+            val text = when (p) {
+                SendProgress.Sending -> "Sending…"
+                SendProgress.Searching -> "No answer; looking for the TV on the network…"
+                is SendProgress.Relocated -> "Found at ${p.host}, sending…"
+            }
+            _state.update { it.copy(status = text) }
+        }
+        when (val r = container.sendCoordinator.send(tv, AddTvViewModel.TEST_VIDEO_URL, onProgress)) {
             is SendResult.Success -> "Playing via ${TargetApp.displayName(r.packageUsed)} (${r.durationMs} ms)."
             is SendResult.NoPlayerApp -> "SmartTube is not installed on this TV."
             is SendResult.Failure -> describe(r.error)
@@ -235,6 +271,9 @@ fun TvDetailScreen(vm: TvDetailViewModel, onBack: () -> Unit) {
                 OutlinedButton(onClick = vm::wake, enabled = !s.busy) { Text("Wake") }
                 OutlinedButton(onClick = vm::sendTestVideo, enabled = !s.busy) { Text("Test video") }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = vm::locate, enabled = !s.busy) { Text("Find on network") }
+            }
             TextButton(onClick = vm::reconnect, enabled = !s.busy) { Text("Reconnect (re-approve on the TV)") }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (s.busy) {
@@ -248,6 +287,10 @@ fun TvDetailScreen(vm: TvDetailViewModel, onBack: () -> Unit) {
             val seen = tv.lastSeenOk?.let { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it)) } ?: "never"
             Text("Last successful send: $seen", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("Connection: ${tv.mode.name.replace('_', ' ').lowercase()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Device ID: ${TvIdentity.display(tv.serial) ?: "not recorded yet (tap Test)"}",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 

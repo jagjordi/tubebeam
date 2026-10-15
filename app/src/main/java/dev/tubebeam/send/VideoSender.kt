@@ -2,6 +2,7 @@ package dev.tubebeam.send
 
 import dev.tubebeam.adb.AdbError
 import dev.tubebeam.adb.AdbTransport
+import dev.tubebeam.discovery.TvIdentity
 import dev.tubebeam.youtube.TargetApp
 
 /** Where to send: enough of a TvDevice to open a connection. */
@@ -13,7 +14,7 @@ data class SendTarget(
 )
 
 sealed interface SendResult {
-    data class Success(val durationMs: Long, val packageUsed: String?) : SendResult
+    data class Success(val durationMs: Long, val packageUsed: String?, val identity: String? = null) : SendResult
     data class Failure(val error: AdbError, val durationMs: Long) : SendResult
     /** Connected fine, but neither SmartTube nor the YouTube app is installed on the TV. */
     data class NoPlayerApp(val durationMs: Long) : SendResult
@@ -25,7 +26,11 @@ sealed interface SendResult {
  */
 class VideoSender(private val adb: AdbTransport) {
 
-    suspend fun send(target: SendTarget, url: String, wakeTv: Boolean = true): SendResult {
+    /**
+     * [readIdentity] adds one shell round trip to read the TV's [TvIdentity]; used once per TV so
+     * it can be found again after an IP change.
+     */
+    suspend fun send(target: SendTarget, url: String, wakeTv: Boolean = true, readIdentity: Boolean = false): SendResult {
         val started = System.currentTimeMillis()
         fun elapsed() = System.currentTimeMillis() - started
         return try {
@@ -45,7 +50,8 @@ class VideoSender(private val adb: AdbTransport) {
                     }
                     used = null
                 }
-                SendResult.Success(elapsed(), used)
+                val identity = if (readIdentity) runCatching { TvIdentity.parse(s.shell(TvIdentity.COMMAND).stdout) }.getOrNull() else null
+                SendResult.Success(elapsed(), used, identity)
             }
         } catch (e: AdbError) {
             SendResult.Failure(e, elapsed())

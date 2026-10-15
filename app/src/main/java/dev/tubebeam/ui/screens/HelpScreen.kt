@@ -47,7 +47,7 @@ fun HelpScreen(onBack: () -> Unit) {
             Step(1, "Settings → Device Preferences → About. Select \"Build\" seven times to enable Developer options.")
             Step(2, "Settings → Device Preferences → Developer options. Turn on \"USB debugging\" and, if shown, \"Network debugging\" (wording varies by brand).")
             Step(3, "Find the TV's IP address: Settings → Network & Internet → your Wi-Fi network.")
-            Step(4, "Strongly recommended: give the TV a fixed IP with a DHCP reservation in your router, so it never changes.")
+            Step(4, "Recommended: give the TV a fixed IP with a DHCP reservation in your router. If it does change, TubeBeam looks for the TV on the network by its device ID and updates the address by itself.")
             Step(5, "Make sure SmartTube is installed on the TV.")
 
             Section("Adding the TV in TubeBeam")
@@ -56,6 +56,7 @@ fun HelpScreen(onBack: () -> Unit) {
             Section("If something doesn't work")
             Bullet("\"Connection refused\": debugging is off on the TV. Some TVs turn it off after every reboot or update; switch it back on.")
             Bullet("\"Can't reach\": the TV is off, or phone and TV are on different networks. Guest Wi-Fi and \"client isolation\" also block it.")
+            Bullet("Orange dot next to a TV: it didn't answer a quick check. Tap the search icon (or \"Find on network\" on the TV's page) to look for it under a new IP.")
             Bullet("No prompt appears on the TV: some Sony and TCL models only show it after you have connected once over USB. Alternatively revoke authorizations in Developer options and retry.")
             Bullet("\"Hasn't trusted this phone\": the TV rejected or forgot the key. Open the TV in TubeBeam and tap Reconnect.")
             Bullet("TVs with only \"Wireless debugging\" (Android 11+, random port) need pairing, which a later version will add.")

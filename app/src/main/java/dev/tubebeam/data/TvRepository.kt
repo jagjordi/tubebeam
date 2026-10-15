@@ -28,4 +28,12 @@ class TvRepository(private val dao: TvDao) {
     suspend fun setDefault(id: Long?) = if (id == null) dao.clearDefault() else dao.setDefault(id)
 
     suspend fun markSeen(id: Long, timestamp: Long = System.currentTimeMillis()) = dao.markSeen(id, timestamp)
+
+    /** Called when the TV was found at a new address. */
+    suspend fun updateHost(id: Long, host: String) = dao.updateHost(id, host)
+
+    /** Records the TV's identity the first time we learn it; never overwrites a known one with null. */
+    suspend fun rememberSerial(id: Long, serial: String?) {
+        if (serial != null) dao.updateSerial(id, serial)
+    }
 }

@@ -28,7 +28,7 @@ Download the APK from the [latest release](https://github.com/jagjordi/tubebeam/
 
 1. Settings → Device Preferences → About → select **Build** seven times to enable Developer options.
 2. Settings → Device Preferences → Developer options → enable **USB debugging** and, if present, **Network debugging** (wording varies by vendor).
-3. Note the TV's IP address (Settings → Network). A DHCP reservation in your router is strongly recommended.
+3. Note the TV's IP address (Settings → Network). A DHCP reservation in your router is recommended, but not required: TubeBeam records the TV's serial and, if the address stops answering, finds the TV again via mDNS or a quick subnet scan and updates it.
 4. Have SmartTube installed.
 
 Then in TubeBeam: **Add TV**, enter a name and the IP, tap **Connect**, and accept the prompt on the TV.
@@ -41,8 +41,9 @@ Tested with a Xiaomi Mi Box and a Philips Android TV. Any Android TV, TV box, Ch
 - [x] Link parsing for youtu.be, watch, Shorts, live, embed, music.youtube.com, timestamps and playlists
 - [x] Share-sheet target, single-TV instant send, multi-TV picker with "remember my choice"
 - [x] TV list, add/rename/remove, default TV, test and wake actions
+- [x] Reachability dots in the picker; TVs whose IP changed are found again by serial (mDNS first, subnet sweep as fallback), automatically on send or via "Find on network"
 - [ ] Android 11+ **Wireless debugging** (TLS pairing with code, mDNS port discovery)
-- [ ] Direct Share shortcuts per TV, app icon, release builds
+- [ ] Direct Share shortcuts per TV, app icon
 
 Detected player packages, in order of preference: `com.liskovsoft.smarttubetv.beta`, `org.smarttube.stable`, `com.teamsmart.videomanager.tv`, `com.liskovsoft.smarttubetv`, and the official `com.google.android.youtube.tv` as a fallback.
 

@@ -13,5 +13,7 @@ data class TvDevice(
     val targetPackage: String? = null,                 // detected SmartTube package; null = auto-detect at send time
     val isDefault: Boolean = false,
     val lastSeenOk: Long? = null,                      // epoch ms of last successful send
+    /** Stable identity read over ADB (ro.serialno, or android_id as fallback); lets us find the TV after an IP change. */
+    val serial: String? = null,
     val sortOrder: Int = 0,
 )

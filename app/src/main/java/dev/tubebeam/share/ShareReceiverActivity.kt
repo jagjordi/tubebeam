@@ -82,8 +82,14 @@ class ShareReceiverActivity : ComponentActivity() {
                                 ) { },
                         ) {
                             when (val s = ui) {
-                                is ShareUi.Pick -> TvPickerSheet(s.tvs, s.defaultId) { tv, remember -> vm.choose(tv, remember) }
-                                is ShareUi.Sending -> SendingCard(s.tv.name)
+                                is ShareUi.Pick -> TvPickerSheet(
+                                    tvs = s.tvs,
+                                    defaultId = s.defaultId,
+                                    status = s.status,
+                                    onPick = { tv, remember -> vm.choose(tv, remember) },
+                                    onLocate = vm::locate,
+                                )
+                                is ShareUi.Sending -> SendingCard(s.tv.name, s.progress)
                                 is ShareUi.Sent -> SentCard(s.tv.name, ShareViewModel.describePackage(s.packageUsed))
                                 is ShareUi.Error -> ErrorCard(
                                     message = s.message,

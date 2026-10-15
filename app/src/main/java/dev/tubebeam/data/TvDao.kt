@@ -41,4 +41,10 @@ interface TvDao {
 
     @Query("UPDATE tv_devices SET lastSeenOk = :timestamp WHERE id = :id")
     suspend fun markSeen(id: Long, timestamp: Long)
+
+    @Query("UPDATE tv_devices SET host = :host WHERE id = :id")
+    suspend fun updateHost(id: Long, host: String)
+
+    @Query("UPDATE tv_devices SET serial = :serial WHERE id = :id")
+    suspend fun updateSerial(id: Long, serial: String?)
 }

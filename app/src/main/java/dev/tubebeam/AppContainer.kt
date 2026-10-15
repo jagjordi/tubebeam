@@ -7,6 +7,9 @@ import dev.tubebeam.adb.KadbTransport
 import dev.tubebeam.data.AppDatabase
 import dev.tubebeam.data.SettingsStore
 import dev.tubebeam.data.TvRepository
+import dev.tubebeam.discovery.MdnsCandidates
+import dev.tubebeam.discovery.SubnetSweep
+import dev.tubebeam.discovery.TvFinder
 import dev.tubebeam.send.SendCoordinator
 import dev.tubebeam.send.VideoSender
 
@@ -18,5 +21,6 @@ class AppContainer(context: Context) {
     val db: AppDatabase by lazy { AppDatabase.build(context) }
     val repo: TvRepository by lazy { TvRepository(db.tvDao()) }
     val settings: SettingsStore = SettingsStore(context)
-    val sendCoordinator: SendCoordinator by lazy { SendCoordinator(sender, repo, settings) }
+    val finder: TvFinder by lazy { TvFinder(adb, listOf(MdnsCandidates(context), SubnetSweep(context, adb))) }
+    val sendCoordinator: SendCoordinator by lazy { SendCoordinator(sender, repo, settings::current, finder) }
 }

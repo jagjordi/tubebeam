@@ -44,6 +44,7 @@ import dev.tubebeam.adb.AdbError
 import dev.tubebeam.adb.PortProbe
 import dev.tubebeam.data.ConnectionMode
 import dev.tubebeam.data.TvDevice
+import dev.tubebeam.discovery.TvIdentity
 import dev.tubebeam.send.SendResult
 import dev.tubebeam.youtube.TargetApp
 import kotlinx.coroutines.Dispatchers
@@ -129,8 +130,9 @@ class AddTvViewModel(private val container: AppContainer) : ViewModel() {
                 _state.update { it.copy(step = AddTvStep.Detecting) }
                 val model = runCatching { session.shell("getprop ro.product.model").stdout.trim().ifEmpty { null } }.getOrNull()
                 val pkg = runCatching { TargetApp.pickFrom(session.shell(TargetApp.DETECT_COMMAND).stdout) }.getOrNull()
+                val serial = runCatching { TvIdentity.parse(session.shell(TvIdentity.COMMAND).stdout) }.getOrNull()
                 val id = container.repo.add(
-                    TvDevice(name = name, host = host, port = port, mode = ConnectionMode.LEGACY_TCP, targetPackage = pkg),
+                    TvDevice(name = name, host = host, port = port, mode = ConnectionMode.LEGACY_TCP, targetPackage = pkg, serial = serial),
                 )
                 container.repo.markSeen(id)
                 _state.update { it.copy(step = AddTvStep.Done(id, model, pkg)) }

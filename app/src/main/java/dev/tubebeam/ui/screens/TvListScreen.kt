@@ -46,7 +46,12 @@ import androidx.lifecycle.viewModelScope
 import dev.tubebeam.AppContainer
 import dev.tubebeam.data.Settings
 import dev.tubebeam.data.TvDevice
+import dev.tubebeam.adb.PortProbe
+import dev.tubebeam.share.RowStatus
+import dev.tubebeam.share.ShareViewModel
 import dev.tubebeam.share.StatusDot
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -57,6 +62,21 @@ class TvListViewModel(private val container: AppContainer) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val settings: StateFlow<Settings> = container.settings.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Settings())
+
+    /** Result of a quick TCP probe per TV, refreshed whenever the list is (re)loaded. */
+    private val _status = MutableStateFlow<Map<Long, RowStatus>>(emptyMap())
+    val status: StateFlow<Map<Long, RowStatus>> = _status
+
+    init {
+        viewModelScope.launch { tvs.collect { list -> list?.forEach(::probe) } }
+    }
+
+    private fun probe(tv: TvDevice) {
+        viewModelScope.launch {
+            val up = container.adb.probe(tv.host, tv.port, timeoutMs = ShareViewModel.PROBE_TIMEOUT_MS) == PortProbe.OPEN
+            _status.update { it + (tv.id to if (up) RowStatus.ONLINE else RowStatus.OFFLINE) }
+        }
+    }
 
     fun setWakeTv(v: Boolean) = viewModelScope.launch { container.settings.setWakeTv(v) }
     fun setAlwaysUseDefault(v: Boolean) = viewModelScope.launch { container.settings.setAlwaysUseDefault(v) }
@@ -72,6 +92,7 @@ fun TvListScreen(
     onDebug: () -> Unit,
 ) {
     val tvs by vm.tvs.collectAsStateWithLifecycle()
+    val status by vm.status.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -105,7 +126,7 @@ fun TvListScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(list, key = { it.id }) { tv -> TvRow(tv, onClick = { onOpen(tv) }) }
+                items(list, key = { it.id }) { tv -> TvRow(tv, status[tv.id] ?: RowStatus.UNKNOWN, onClick = { onOpen(tv) }) }
                 item {
                     Spacer(Modifier.height(16.dp))
                     Text("Sharing", style = MaterialTheme.typography.titleSmall)
@@ -134,7 +155,7 @@ fun TvListScreen(
 }
 
 @Composable
-private fun TvRow(tv: TvDevice, onClick: () -> Unit) {
+private fun TvRow(tv: TvDevice, status: RowStatus, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(16.dp)) {
             Icon(Icons.Default.Tv, contentDescription = null)
@@ -151,7 +172,7 @@ private fun TvRow(tv: TvDevice, onClick: () -> Unit) {
                 Icon(Icons.Default.Star, contentDescription = "Default", tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
             }
-            StatusDot(seen = tv.lastSeenOk != null)
+            StatusDot(status = status)
         }
     }
 }
