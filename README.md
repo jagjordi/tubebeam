@@ -5,7 +5,7 @@
 
 Share a YouTube link from your phone and it plays in **[SmartTube](https://github.com/yuliskov/SmartTube)** on your Android TV. No casting, no remote-control pairing, and the TV wakes up and launches SmartTube by itself.
 
-TubeBeam is an Android phone app that appears in the system **Share** sheet as "Send to TV". Share a video from the YouTube app, Chrome, YouTube Music, Shorts, or anywhere else, and it opens on the TV. With one TV it just sends; with several, a small floating picker lets you choose.
+TubeBeam is an Android phone app that appears in the system **Share** sheet as "Send to TV" and "Queue on TV". Share a video from the YouTube app, Chrome, YouTube Music, Shorts, or anywhere else, and it opens on the TV, or lines up after what is already playing. With one TV it just sends; with several, a small floating picker lets you choose.
 
 ## How it works
 
@@ -17,6 +17,8 @@ am start -a android.intent.action.VIEW -d 'https://www.youtube.com/watch?v=VIDEO
 ```
 
 SmartTube receives the VIEW intent and plays the video. As a side effect this also wakes the TV and launches SmartTube if it was closed, which plain casting cannot do.
+
+"Queue on TV" sends the same intent with `--ez add_to_queue true`. SmartTube with queue support appends the video to its playback queue while the current one keeps playing (if nothing is playing, it just plays). That support is a small patch to SmartTube that has been submitted upstream; until it ships in a SmartTube release, build it yourself with [`smarttube/build.sh`](smarttube/README.md). Stock SmartTube ignores the extra and plays the video right away.
 
 The phone identifies itself with an RSA key. The first time you connect, the TV shows its usual **"Allow USB debugging?"** prompt with the key fingerprint; tick *Always allow from this computer* once and the TV trusts the phone from then on. The app shows the same fingerprint so you can compare.
 
@@ -42,6 +44,7 @@ Tested with a Xiaomi Mi Box and a Philips Android TV. Any Android TV, TV box, Ch
 - [x] Share-sheet target, single-TV instant send, multi-TV picker with "remember my choice"
 - [x] TV list, add/rename/remove, default TV, test and wake actions
 - [x] Reachability dots in the picker; TVs whose IP changed are found again by serial (mDNS first, subnet sweep as fallback), automatically on send or via "Find on network"
+- [x] "Queue on TV" share target: adds to SmartTube's playback queue (needs the SmartTube patch in `smarttube/`)
 - [ ] Android 11+ **Wireless debugging** (TLS pairing with code, mDNS port discovery)
 - [ ] Direct Share shortcuts per TV, app icon
 

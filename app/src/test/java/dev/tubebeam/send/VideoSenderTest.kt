@@ -52,6 +52,27 @@ class VideoSenderTest {
     }
 
     @Test
+    fun enqueueAddsTheQueueExtraBeforeThePackage() = runTest {
+        val t = FakeTransport({ ok("Starting") })
+        val r = VideoSender(t).send(SendTarget("1.2.3.4", 5555, TargetApp.SMARTTUBE_STABLE), url, wakeTv = false, enqueue = true)
+        assertTrue(r is SendResult.Success)
+        assertEquals(
+            "am start -a android.intent.action.VIEW -d '$url' --ez ${VideoSender.ENQUEUE_EXTRA} true -p ${TargetApp.SMARTTUBE_STABLE}",
+            t.commands[0],
+        )
+    }
+
+    @Test
+    fun enqueueSurvivesTheRetryWithoutPackage() = runTest {
+        val t = FakeTransport({ cmd ->
+            if ("-p " in cmd) ok("Error: Activity not started, unable to resolve Intent") else ok("Starting")
+        })
+        VideoSender(t).send(SendTarget("1.2.3.4", 5555, "com.gone.app"), url, enqueue = true)
+        assertEquals(2, t.commands.size)
+        assertTrue("--ez ${VideoSender.ENQUEUE_EXTRA} true" in t.commands[1])
+    }
+
+    @Test
     fun detectsPackageWhenNoneStored() = runTest {
         val t = FakeTransport({ cmd ->
             if (cmd == TargetApp.DETECT_COMMAND) ok("package:a\npackage:${TargetApp.SMARTTUBE_BETA}\n") else ok("Starting")

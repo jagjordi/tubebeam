@@ -24,6 +24,7 @@ class SendCoordinatorTest {
     /** Hosts in [alive] accept connections; each answers identity queries with its mapped id and `am start` with success. */
     private class FakeTransport(private val alive: Map<String, String>) : AdbTransport {
         val sentFrom = mutableListOf<String>()
+        val commands = mutableListOf<String>()
         override suspend fun probe(host: String, port: Int, timeoutMs: Int) =
             if (host in alive) PortProbe.OPEN else PortProbe.UNREACHABLE
         override suspend fun connect(host: String, port: Int, connectTimeoutMs: Int, ioTimeoutMs: Int): AdbSession {
@@ -31,7 +32,7 @@ class SendCoordinatorTest {
             return object : AdbSession {
                 override suspend fun shell(command: String): ShellResult {
                     if (command.startsWith("getprop ro.serialno")) return ShellResult("$id\nandroid", "", 0)
-                    if ("am start" in command) sentFrom += host
+                    if ("am start" in command) { sentFrom += host; commands += command }
                     return ShellResult("Starting: Intent", "", 0)
                 }
                 override fun close() = Unit
@@ -67,6 +68,16 @@ class SendCoordinatorTest {
 
     private fun coordinator(t: FakeTransport, dao: MemoryDao, candidates: List<String>) =
         SendCoordinator(VideoSender(t), TvRepository(dao), settings, TvFinder(t, listOf(ListSource(candidates))))
+
+    @Test
+    fun enqueueIsForwardedToEveryAttemptIncludingTheRetry() = runTest {
+        val t = FakeTransport(mapOf("192.168.1.130" to "TV1"))
+        val dao = MemoryDao(TvDevice(id = 1, name = "TV", host = "192.168.1.121", targetPackage = "org.smarttube.stable", serial = "serial:TV1"))
+        val r = coordinator(t, dao, listOf("192.168.1.130")).send(dao.tv, url, enqueue = true)
+        assertTrue(r is SendResult.Success)
+        assertEquals(1, t.commands.size)
+        assertTrue(t.commands[0].contains("--ez add_to_queue true"))
+    }
 
     @Test
     fun relocatesWhenStoredAddressIsDeadAndSavesNewHost() = runTest {

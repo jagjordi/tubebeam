@@ -24,9 +24,9 @@ sealed interface ShareUi {
     data object Loading : ShareUi
     data object NotYouTube : ShareUi
     data object NoTvs : ShareUi
-    data class Pick(val tvs: List<TvDevice>, val defaultId: Long?, val status: Map<Long, RowStatus> = emptyMap()) : ShareUi
-    data class Sending(val tv: TvDevice, val progress: SendProgress = SendProgress.Sending) : ShareUi
-    data class Sent(val tv: TvDevice, val packageUsed: String?) : ShareUi
+    data class Pick(val tvs: List<TvDevice>, val defaultId: Long?, val status: Map<Long, RowStatus> = emptyMap(), val enqueue: Boolean = false) : ShareUi
+    data class Sending(val tv: TvDevice, val progress: SendProgress = SendProgress.Sending, val enqueue: Boolean = false) : ShareUi
+    data class Sent(val tv: TvDevice, val packageUsed: String?, val enqueue: Boolean = false) : ShareUi
     data class Error(val tv: TvDevice, val message: String, val hint: String?) : ShareUi
 }
 
@@ -35,12 +35,14 @@ class ShareViewModel(private val container: AppContainer) : ViewModel() {
     val ui: StateFlow<ShareUi> = _ui
 
     private var url: String? = null
+    private var enqueue = false
     private var started = false
 
-    /** Called once with the shared text. */
-    fun start(sharedText: String?) {
+    /** Called once with the shared text. [enqueue] adds to SmartTube's playback queue instead of playing. */
+    fun start(sharedText: String?, enqueue: Boolean = false) {
         if (started) return
         started = true
+        this.enqueue = enqueue
         val link = YouTubeLinkParser.parse(sharedText)
         if (link == null) {
             _ui.value = ShareUi.NotYouTube
@@ -61,7 +63,7 @@ class ShareViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     private fun showPicker(tvs: List<TvDevice>, defaultId: Long?) {
-        _ui.value = ShareUi.Pick(tvs, defaultId)
+        _ui.value = ShareUi.Pick(tvs, defaultId, enqueue = enqueue)
         // Quick liveness check per row so the user sees which TVs will answer before choosing.
         tvs.forEach { tv ->
             viewModelScope.launch {
@@ -113,10 +115,10 @@ class ShareViewModel(private val container: AppContainer) : ViewModel() {
 
     private suspend fun send(tv: TvDevice) {
         val target = url ?: return
-        _ui.value = ShareUi.Sending(tv)
-        val result = container.sendCoordinator.send(tv, target) { p -> _ui.value = ShareUi.Sending(tv, p) }
+        _ui.value = ShareUi.Sending(tv, enqueue = enqueue)
+        val result = container.sendCoordinator.send(tv, target, enqueue) { p -> _ui.value = ShareUi.Sending(tv, p, enqueue) }
         _ui.value = when (val r = result) {
-            is SendResult.Success -> ShareUi.Sent(tv, r.packageUsed)
+            is SendResult.Success -> ShareUi.Sent(tv, r.packageUsed, enqueue)
             is SendResult.NoPlayerApp -> ShareUi.Error(tv, "SmartTube isn't installed on ${tv.name}.", null)
             is SendResult.Failure -> ShareUi.Error(tv, friendlyMessage(tv, r.error), hint(r.error))
         }

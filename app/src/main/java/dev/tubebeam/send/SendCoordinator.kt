@@ -27,11 +27,12 @@ class SendCoordinator(
     private val currentSettings: suspend () -> Settings,
     private val finder: TvFinder? = null,
 ) {
-    suspend fun send(tv: TvDevice, url: String, onProgress: (SendProgress) -> Unit = {}): SendResult {
+    /** [enqueue] adds the video to SmartTube's playback queue instead of playing it right away. */
+    suspend fun send(tv: TvDevice, url: String, enqueue: Boolean = false, onProgress: (SendProgress) -> Unit = {}): SendResult {
         onProgress(SendProgress.Sending)
         val wake = currentSettings().wakeTv
         var device = tv
-        var result = attempt(device, url, wake)
+        var result = attempt(device, url, wake, enqueue)
 
         if (result.isUnreachable() && finder != null && device.serial != null) {
             onProgress(SendProgress.Searching)
@@ -39,7 +40,7 @@ class SendCoordinator(
             if (found is FindResult.Found) {
                 onProgress(SendProgress.Relocated(found.host))
                 device = device.copy(host = found.host)
-                result = attempt(device, url, wake)
+                result = attempt(device, url, wake, enqueue)
                 if (result is SendResult.Success) repo.updateHost(device.id, found.host)
             }
         }
@@ -51,8 +52,8 @@ class SendCoordinator(
         return result
     }
 
-    private suspend fun attempt(tv: TvDevice, url: String, wake: Boolean): SendResult =
-        sender.send(SendTarget(tv.host, tv.port, tv.targetPackage), url, wakeTv = wake, readIdentity = tv.serial == null)
+    private suspend fun attempt(tv: TvDevice, url: String, wake: Boolean, enqueue: Boolean): SendResult =
+        sender.send(SendTarget(tv.host, tv.port, tv.targetPackage), url, wakeTv = wake, readIdentity = tv.serial == null, enqueue = enqueue)
 
     private fun SendResult.isUnreachable(): Boolean =
         this is SendResult.Failure && (error is AdbError.Unreachable || error is AdbError.Timeout)

@@ -40,11 +40,13 @@ class ShareReceiverActivity : ComponentActivity() {
         val container = TubeBeamApp.container(this)
         val sharedText = intent?.getStringExtra(Intent.EXTRA_TEXT)
             ?: intent?.dataString // also accept ACTION_VIEW on a youtube link
+        // "Queue on TV" is an activity-alias of this activity; the alias name is the only difference.
+        val enqueue = intent?.component?.className?.endsWith(QUEUE_ALIAS) == true
 
         setContent {
             TubeBeamTheme {
                 val vm: ShareViewModel = viewModel { ShareViewModel(container) }
-                LaunchedEffect(Unit) { vm.start(sharedText) }
+                LaunchedEffect(Unit) { vm.start(sharedText, enqueue) }
                 val ui by vm.ui.collectAsStateWithLifecycle()
 
                 LaunchedEffect(ui) {
@@ -86,11 +88,12 @@ class ShareReceiverActivity : ComponentActivity() {
                                     tvs = s.tvs,
                                     defaultId = s.defaultId,
                                     status = s.status,
+                                    title = if (s.enqueue) "Queue on" else "Send to",
                                     onPick = { tv, remember -> vm.choose(tv, remember) },
                                     onLocate = vm::locate,
                                 )
-                                is ShareUi.Sending -> SendingCard(s.tv.name, s.progress)
-                                is ShareUi.Sent -> SentCard(s.tv.name, ShareViewModel.describePackage(s.packageUsed))
+                                is ShareUi.Sending -> SendingCard(s.tv.name, s.progress, s.enqueue)
+                                is ShareUi.Sent -> SentCard(s.tv.name, ShareViewModel.describePackage(s.packageUsed), s.enqueue)
                                 is ShareUi.Error -> ErrorCard(
                                     message = s.message,
                                     hint = s.hint,
@@ -108,6 +111,10 @@ class ShareReceiverActivity : ComponentActivity() {
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    private companion object {
+        const val QUEUE_ALIAS = ".QueueShareActivity"
+    }
 
     private fun openApp(tvId: Long? = null) {
         startActivity(

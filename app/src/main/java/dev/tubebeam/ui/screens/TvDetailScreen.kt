@@ -179,7 +179,7 @@ class TvDetailViewModel(private val container: AppContainer, private val tvId: L
             }
             _state.update { it.copy(status = text) }
         }
-        when (val r = container.sendCoordinator.send(tv, AddTvViewModel.TEST_VIDEO_URL, onProgress)) {
+        when (val r = container.sendCoordinator.send(tv, AddTvViewModel.TEST_VIDEO_URL, onProgress = onProgress)) {
             is SendResult.Success -> "Playing via ${TargetApp.displayName(r.packageUsed)} (${r.durationMs} ms)."
             is SendResult.NoPlayerApp -> "SmartTube is not installed on this TV."
             is SendResult.Failure -> describe(r.error)

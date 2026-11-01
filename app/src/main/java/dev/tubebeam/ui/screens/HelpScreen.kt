@@ -43,6 +43,12 @@ fun HelpScreen(onBack: () -> Unit) {
                     "waking the TV and launching SmartTube if needed.",
             )
 
+            Section("Queue on TV")
+            Body(
+                "The share sheet has a second entry, \"Queue on TV\", that adds the video after whatever is playing in SmartTube instead of replacing it. " +
+                    "It needs a SmartTube build with queue support (see the TubeBeam project page); the regular SmartTube just plays the video right away.",
+            )
+
             Section("One-time setup on the TV")
             Step(1, "Settings → Device Preferences → About. Select \"Build\" seven times to enable Developer options.")
             Step(2, "Settings → Device Preferences → Developer options. Turn on \"USB debugging\" and, if shown, \"Network debugging\" (wording varies by brand).")

@@ -29,8 +29,17 @@ class VideoSender(private val adb: AdbTransport) {
     /**
      * [readIdentity] adds one shell round trip to read the TV's [TvIdentity]; used once per TV so
      * it can be found again after an IP change.
+     *
+     * [enqueue] asks SmartTube to append the video to its playback queue instead of playing it now
+     * (the `add_to_queue` extra; SmartTube builds without that support just play the video).
      */
-    suspend fun send(target: SendTarget, url: String, wakeTv: Boolean = true, readIdentity: Boolean = false): SendResult {
+    suspend fun send(
+        target: SendTarget,
+        url: String,
+        wakeTv: Boolean = true,
+        readIdentity: Boolean = false,
+        enqueue: Boolean = false,
+    ): SendResult {
         val started = System.currentTimeMillis()
         fun elapsed() = System.currentTimeMillis() - started
         return try {
@@ -40,11 +49,11 @@ class VideoSender(private val adb: AdbTransport) {
                     // Without a player the TV's stub handler just toasts "You don't have an app that can do this".
                     ?: return SendResult.NoPlayerApp(elapsed())
 
-                val first = s.shell(buildCommand(url, pkg, wakeTv))
+                val first = s.shell(buildCommand(url, pkg, wakeTv, enqueue))
                 var used: String? = pkg
                 if (looksLikeFailure(first.allOutput)) {
                     // The stored package may be gone or no longer handle youtube.com; let the TV choose.
-                    val second = s.shell(buildCommand(url, null, wake = false))
+                    val second = s.shell(buildCommand(url, null, wake = false, enqueue = enqueue))
                     if (looksLikeFailure(second.allOutput)) {
                         throw AdbError.Unknown(IllegalStateException(second.allOutput.trim().ifEmpty { "am start failed" }))
                     }
@@ -71,9 +80,13 @@ class VideoSender(private val adb: AdbTransport) {
         const val SHELL_TIMEOUT_MS = 5_000
         private const val WAKE = "input keyevent KEYCODE_WAKEUP"
 
-        internal fun buildCommand(url: String, pkg: String?, wake: Boolean): String = buildString {
+        /** Intent extra understood by SmartTube builds with queue support. */
+        const val ENQUEUE_EXTRA = "add_to_queue"
+
+        internal fun buildCommand(url: String, pkg: String?, wake: Boolean, enqueue: Boolean = false): String = buildString {
             if (wake) append(WAKE).append("; ")
             append("am start -a android.intent.action.VIEW -d ").append(shellQuote(url))
+            if (enqueue) append(" --ez ").append(ENQUEUE_EXTRA).append(" true")
             if (pkg != null) append(" -p ").append(pkg)
         }
 

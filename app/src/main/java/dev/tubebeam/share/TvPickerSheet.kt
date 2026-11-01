@@ -46,11 +46,12 @@ fun TvPickerSheet(
     status: Map<Long, RowStatus>,
     onPick: (TvDevice, remember: Boolean) -> Unit,
     onLocate: (TvDevice) -> Unit,
+    title: String = "Send to",
 ) {
     var remember by rememberSaveable { mutableStateOf(false) }
     Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp)) {
         Text(
-            "Send to",
+            title,
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
@@ -116,24 +117,25 @@ fun StatusDot(status: RowStatus, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SendingCard(tvName: String, progress: SendProgress = SendProgress.Sending) {
+fun SendingCard(tvName: String, progress: SendProgress = SendProgress.Sending, enqueue: Boolean = false) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(20.dp),
     ) {
         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
         Spacer(Modifier.width(16.dp))
+        val verb = if (enqueue) "queuing" else "sending"
         val text = when (progress) {
-            SendProgress.Sending -> "Sending to $tvName…"
+            SendProgress.Sending -> if (enqueue) "Queuing on $tvName…" else "Sending to $tvName…"
             SendProgress.Searching -> "$tvName isn't answering, looking for it on the network…"
-            is SendProgress.Relocated -> "Found $tvName at ${progress.host}, sending…"
+            is SendProgress.Relocated -> "Found $tvName at ${progress.host}, $verb…"
         }
         Text(text, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
 @Composable
-fun SentCard(tvName: String, via: String) {
+fun SentCard(tvName: String, via: String, enqueue: Boolean = false) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -141,8 +143,12 @@ fun SentCard(tvName: String, via: String) {
         Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF2E7D32))
         Spacer(Modifier.width(16.dp))
         Column {
-            Text("Sent to $tvName", style = MaterialTheme.typography.bodyLarge)
-            Text("Playing in $via", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(if (enqueue) "Queued on $tvName" else "Sent to $tvName", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (enqueue) "Added to the $via playback queue" else "Playing in $via",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

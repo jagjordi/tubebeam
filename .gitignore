@@ -17,3 +17,5 @@
 # The checked-in debug signing key is intentional (see app/build.gradle.kts).
 !app/debug.keystore
 /.env.release
+brag-output*/
+smarttube/SmartTube/

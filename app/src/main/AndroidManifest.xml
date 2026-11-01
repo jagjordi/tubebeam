@@ -38,5 +38,18 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- Second share-sheet entry: same activity, but the video is appended to SmartTube's playback queue. -->
+        <activity-alias
+            android:name=".share.QueueShareActivity"
+            android:targetActivity=".share.ShareReceiverActivity"
+            android:exported="true"
+            android:label="@string/share_queue_label">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

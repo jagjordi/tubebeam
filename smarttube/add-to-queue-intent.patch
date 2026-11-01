@@ -1,0 +1,87 @@
+diff --git a/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/app/presenters/SplashPresenter.java b/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/app/presenters/SplashPresenter.java
+index e2e9cbf..10a0713 100644
+--- a/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/app/presenters/SplashPresenter.java
++++ b/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/app/presenters/SplashPresenter.java
+@@ -12,6 +12,7 @@ import com.liskovsoft.sharedutils.mylogger.Log;
+ import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
+ import com.liskovsoft.sharedutils.rx.RxHelper;
+ import com.liskovsoft.smartyoutubetv2.common.R;
++import com.liskovsoft.smartyoutubetv2.common.app.models.data.Playlist;
+ import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
+ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoStateService;
+ import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
+@@ -261,6 +262,13 @@ public class SplashPresenter extends BasePresenter<SplashView> {
+             if (videoId != null) {
+                 long timeMs = IntentExtractor.extractVideoTimeMs(intent);
+                 PlaybackPresenter playbackPresenter = PlaybackPresenter.instance(getContext());
++
++                // Something is playing (or paused) in the player: queue it instead of replacing it
++                if (IntentExtractor.isAddToQueueIntent(intent) && playbackPresenter.getView() != null && playbackPresenter.getVideo() != null) {
++                    addToPlaybackQueue(videoId, timeMs);
++                    return true;
++                }
++
+                 boolean finishOnEnded = IntentExtractor.hasFinishOnEndedFlag(intent);
+                 boolean incognito = IntentExtractor.isIncognitoIntent(intent);
+                 playbackPresenter.openVideo(videoId, finishOnEnded, timeMs, incognito);
+@@ -355,6 +363,29 @@ public class SplashPresenter extends BasePresenter<SplashView> {
+         }
+     }
+ 
++    /**
++     * Appends the video to the playback queue. Title and author are fetched in the background so the queue dialog can show them.
++     */
++    private void addToPlaybackQueue(String videoId, long timeMs) {
++        Video video = Video.from(videoId);
++        video.fromQueue = true;
++        video.pendingPosMs = timeMs;
++        Playlist.instance().add(video);
++
++        Context context = getContext();
++        String added = context.getString(R.string.added_to_playback_queue);
++
++        RxHelper.execute(
++                YouTubeServiceManager.instance().getMediaItemService().getMetadataObserve(videoId),
++                metadata -> {
++                    video.title = metadata.getTitle();
++                    video.author = metadata.getAuthor();
++                    MessageHelpers.showMessage(context, String.format("%s: %s", video.getTitle(), added));
++                },
++                error -> MessageHelpers.showMessage(context, added)
++        );
++    }
++
+     private void enablePlayerOnlyModeIfNeeded(Intent intent) {
+         ViewManager viewManager = getViewManager();
+ 
+diff --git a/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/utils/IntentExtractor.java b/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/utils/IntentExtractor.java
+index d7744b1..0771b48 100644
+--- a/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/utils/IntentExtractor.java
++++ b/common/src/main/java/com/liskovsoft/smartyoutubetv2/common/utils/IntentExtractor.java
+@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
+ public class IntentExtractor {
+     public static final String RESTART_INTENT = "RESTART_INTENT";
+     public static final String INCOGNITO_INTENT = "INCOGNITO_INTENT";
++    public static final String ADD_TO_QUEUE_INTENT = "add_to_queue";
+     private static final String TAG = IntentExtractor.class.getSimpleName();
+     /**
+      * Browser: https://www.youtube.com/results?search_query=twice<br/>
+@@ -337,6 +338,15 @@ public class IntentExtractor {
+         return intent != null && intent.getBooleanExtra(RESTART_INTENT, false);
+     }
+ 
++    /**
++     * Add the video to the playback queue instead of interrupting what is playing.<br/>
++     * Example: am start -a android.intent.action.VIEW -d 'https://youtu.be/VIDEO_ID' --ez add_to_queue true
++     */
++    public static boolean isAddToQueueIntent(Intent intent) {
++        return intent != null && (intent.getBooleanExtra(ADD_TO_QUEUE_INTENT, false)
++                || "true".equals(intent.getStringExtra(ADD_TO_QUEUE_INTENT)));
++    }
++
+     public static boolean isIncognitoIntent(Intent intent) {
+         return intent != null && intent.getBooleanExtra(INCOGNITO_INTENT, false);
+     }
+diff --git a/gradlew b/gradlew
+old mode 100644
+new mode 100755

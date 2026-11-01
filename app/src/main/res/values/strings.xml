@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">TubeBeam</string>
     <string name="share_target_label">Send to TV</string>
+    <string name="share_queue_label">Queue on TV</string>
 </resources>
