@@ -45,6 +45,7 @@ Tested with a Xiaomi Mi Box and a Philips Android TV. Any Android TV, TV box, Ch
 - [x] TV list, add/rename/remove, default TV, test and wake actions
 - [x] Reachability dots in the picker; TVs whose IP changed are found again by serial (mDNS first, subnet sweep as fallback), automatically on send or via "Find on network"
 - [x] "Queue on TV" share target: adds to SmartTube's playback queue (needs the SmartTube patch in `smarttube/`)
+- [x] "Send to TV" / "Queue on TV" in WizeStream's video long-press menu and Cast button (patch in `wizestream/`)
 - [ ] Android 11+ **Wireless debugging** (TLS pairing with code, mDNS port discovery)
 - [ ] Direct Share shortcuts per TV, app icon
 

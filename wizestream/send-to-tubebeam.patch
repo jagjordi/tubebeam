@@ -1,0 +1,364 @@
+From 2f3cec49fb07c51675b03b98bc3b58601d58c0b9 Mon Sep 17 00:00:00 2001
+From: Jordi <jordiag@kth.se>
+Date: Sun, 1 Nov 2026 14:59:56 +0100
+Subject: [PATCH 1/2] Add "Send to TV" and "Queue on TV" to the stream
+ long-press menu
+
+When TubeBeam (https://github.com/jagjordi/tubebeam) is installed, the
+long-press dialog of a YouTube stream gets two entries that hand the url
+straight to it, without going through the system share sheet. TubeBeam
+sends the video to SmartTube on an Android TV; "Queue on TV" appends it to
+SmartTube's playback queue instead of playing it right away.
+
+The entries are hidden when TubeBeam is not installed or the stream is not
+from YouTube, following the "Play with Kodi" pattern.
+---
+ app/src/main/AndroidManifest.xml              |  2 +
+ .../info_list/dialog/InfoItemDialog.java      | 15 ++++
+ .../dialog/StreamDialogDefaultEntry.java      | 11 +++
+ .../external_communication/TubeBeamUtils.java | 68 +++++++++++++++++++
+ app/src/main/res/values/donottranslate.xml    |  3 +
+ app/src/main/res/values/strings.xml           |  2 +
+ 6 files changed, 101 insertions(+)
+ create mode 100644 app/src/main/java/org/schabi/newpipe/util/external_communication/TubeBeamUtils.java
+
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index ea19844..8dd8a93 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -32,6 +32,8 @@
+             <action android:name="android.intent.action.VIEW" />
+             <data android:scheme="http" />
+         </intent>
++        <!-- TubeBeam: "Send to TV" / "Queue on TV" in the stream long-press menu -->
++        <package android:name="dev.tubebeam" />
+     </queries>
+ 
+     <uses-feature
+diff --git a/app/src/main/java/org/schabi/newpipe/info_list/dialog/InfoItemDialog.java b/app/src/main/java/org/schabi/newpipe/info_list/dialog/InfoItemDialog.java
+index 83c9d49..c7eca79 100644
+--- a/app/src/main/java/org/schabi/newpipe/info_list/dialog/InfoItemDialog.java
++++ b/app/src/main/java/org/schabi/newpipe/info_list/dialog/InfoItemDialog.java
+@@ -35,6 +35,7 @@ import org.schabi.newpipe.player.helper.PlayerHolder;
+ import org.schabi.newpipe.util.StreamTypeUtil;
+ import org.schabi.newpipe.util.ThemeHelper;
+ import org.schabi.newpipe.util.external_communication.KoreUtils;
++import org.schabi.newpipe.util.external_communication.TubeBeamUtils;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
+@@ -350,6 +351,19 @@ public final class InfoItemDialog {
+             return this;
+         }
+ 
++        /**
++         * Adds the {@link StreamDialogDefaultEntry#SEND_TO_TV} and
++         * {@link StreamDialogDefaultEntry#QUEUE_ON_TV} entries if TubeBeam is installed.
++         * @return the current {@link Builder} instance
++         */
++        public Builder addSendToTvEntriesIfNeeded() {
++            if (TubeBeamUtils.shouldShowSendToTv(context, infoItem.getServiceId())) {
++                addEntry(StreamDialogDefaultEntry.SEND_TO_TV);
++                addEntry(StreamDialogDefaultEntry.QUEUE_ON_TV);
++            }
++            return this;
++        }
++
+         /**
+          * Add the entries which are usually at the top of the action list.
+          * <br/>
+@@ -386,6 +400,7 @@ public final class InfoItemDialog {
+                     StreamDialogDefaultEntry.BLOCK_CHANNEL
+             );
+             addPlayWithKodiEntryIfNeeded();
++            addSendToTvEntriesIfNeeded();
+             addLearningContentEntryIfNeeded();
+             if (infoItem.getServiceId() >= 0
+                     && KidsMode.isSubscriptionAllowed(context, infoItem.getServiceId())) {
+diff --git a/app/src/main/java/org/schabi/newpipe/info_list/dialog/StreamDialogDefaultEntry.java b/app/src/main/java/org/schabi/newpipe/info_list/dialog/StreamDialogDefaultEntry.java
+index 707c3a0..0bdc04a 100644
+--- a/app/src/main/java/org/schabi/newpipe/info_list/dialog/StreamDialogDefaultEntry.java
++++ b/app/src/main/java/org/schabi/newpipe/info_list/dialog/StreamDialogDefaultEntry.java
+@@ -29,6 +29,7 @@ import org.schabi.newpipe.util.ContentBlockingHelper;
+ import org.schabi.newpipe.util.NavigationHelper;
+ import org.schabi.newpipe.util.external_communication.KoreUtils;
+ import org.schabi.newpipe.util.external_communication.ShareUtils;
++import org.schabi.newpipe.util.external_communication.TubeBeamUtils;
+ import org.schabi.newpipe.util.image.ExtractorImageCompat;
+ 
+ import java.util.Collections;
+@@ -137,6 +138,16 @@ public enum StreamDialogDefaultEntry {
+     PLAY_WITH_KODI(R.string.play_with_kodi_title, (fragment, item) ->
+             KoreUtils.playWithKore(fragment.requireContext(), Uri.parse(item.getUrl()))),
+ 
++    /**
++     * Sends the stream to a TV through the TubeBeam app, see
++     * {@link TubeBeamUtils#sendToTv(android.content.Context, String, boolean)}.
++     */
++    SEND_TO_TV(R.string.send_to_tv_title, (fragment, item) ->
++            TubeBeamUtils.sendToTv(fragment.requireContext(), item.getUrl(), false)),
++
++    QUEUE_ON_TV(R.string.queue_on_tv_title, (fragment, item) ->
++            TubeBeamUtils.sendToTv(fragment.requireContext(), item.getUrl(), true)),
++
+     COPY_TITLE(R.string.copy_video_title, (fragment, item) ->
+             ShareUtils.copyToClipboard(fragment.requireContext(), item.getName())),
+ 
+diff --git a/app/src/main/java/org/schabi/newpipe/util/external_communication/TubeBeamUtils.java b/app/src/main/java/org/schabi/newpipe/util/external_communication/TubeBeamUtils.java
+new file mode 100644
+index 0000000..f1db2d5
+--- /dev/null
++++ b/app/src/main/java/org/schabi/newpipe/util/external_communication/TubeBeamUtils.java
+@@ -0,0 +1,68 @@
++package org.schabi.newpipe.util.external_communication;
++
++import static org.schabi.newpipe.util.external_communication.ShareUtils.tryOpenIntentInApp;
++
++import android.content.ComponentName;
++import android.content.Context;
++import android.content.Intent;
++
++import androidx.annotation.NonNull;
++
++import org.schabi.newpipe.R;
++import org.schabi.newpipe.extractor.ServiceList;
++
++/**
++ * Util class for TubeBeam, a phone app that sends a YouTube link to SmartTube on an Android TV.
++ * @see <a href="https://github.com/jagjordi/tubebeam">TubeBeam on GitHub</a>
++ */
++public final class TubeBeamUtils {
++    private TubeBeamUtils() { }
++
++    /**
++     * @param serviceId the service of the stream
++     * @return whether TubeBeam can play streams of this service (only YouTube)
++     */
++    public static boolean isServiceSupported(final int serviceId) {
++        return serviceId == ServiceList.YouTube.getServiceId();
++    }
++
++    /**
++     * @param context   the context to use
++     * @param serviceId the service of the stream
++     * @return whether the "Send to TV" entries should be offered: YouTube stream and TubeBeam
++     *         installed
++     */
++    public static boolean shouldShowSendToTv(@NonNull final Context context,
++                                             final int serviceId) {
++        return isServiceSupported(serviceId)
++                && context.getPackageManager()
++                .resolveActivity(buildIntent(context, "", false), 0) != null;
++    }
++
++    /**
++     * Hands the stream url to TubeBeam, which forwards it to the TV without showing the share
++     * sheet.
++     *
++     * @param context   the context to use
++     * @param streamUrl the url of the stream
++     * @param enqueue   true to add the stream to SmartTube's playback queue instead of playing it
++     */
++    public static void sendToTv(@NonNull final Context context,
++                                @NonNull final String streamUrl,
++                                final boolean enqueue) {
++        tryOpenIntentInApp(context, buildIntent(context, streamUrl, enqueue));
++    }
++
++    private static Intent buildIntent(@NonNull final Context context,
++                                      @NonNull final String streamUrl,
++                                      final boolean enqueue) {
++        final String pkg = context.getString(R.string.tubebeam_package);
++        final String activity = context.getString(enqueue
++                ? R.string.tubebeam_queue_activity : R.string.tubebeam_send_activity);
++        return new Intent(Intent.ACTION_SEND)
++                .setComponent(new ComponentName(pkg, activity))
++                .setType("text/plain")
++                .putExtra(Intent.EXTRA_TEXT, streamUrl)
++                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++    }
++}
+diff --git a/app/src/main/res/values/donottranslate.xml b/app/src/main/res/values/donottranslate.xml
+index 3a1d1b3..c2eaf22 100644
+--- a/app/src/main/res/values/donottranslate.xml
++++ b/app/src/main/res/values/donottranslate.xml
+@@ -3,6 +3,9 @@
+     <string name="rss_button_title">RSS</string>
+     <string name="vlc_package">org.videolan.vlc</string>
+     <string name="kore_package">org.xbmc.kore</string>
++    <string name="tubebeam_package">dev.tubebeam</string>
++    <string name="tubebeam_send_activity">dev.tubebeam.share.ShareReceiverActivity</string>
++    <string name="tubebeam_queue_activity">dev.tubebeam.share.QueueShareActivity</string>
+     <string name="peertube_instance_list_url">https://joinpeertube.org/instances#instances-list</string>
+     <string name="notification_channel_id">newpipe</string>
+     <string name="app_update_notification_channel_id">newpipeAppUpdate</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index bc3dfde..6739874 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -201,6 +201,8 @@
+     <string name="show_higher_resolutions_title">Show higher resolutions</string>
+     <string name="show_higher_resolutions_summary">Only some devices can play 2K/4K videos</string>
+     <string name="play_with_kodi_title">Play with Kodi</string>
++    <string name="send_to_tv_title">Send to TV</string>
++    <string name="queue_on_tv_title">Queue on TV</string>
+     <string name="kore_not_found">Install missing Kore app\?</string>
+     <string name="show_play_with_kodi_title">Show \"Play with Kodi\" option</string>
+     <string name="show_play_with_kodi_summary">Display an option to play a video via Kodi media center</string>
+-- 
+2.56.0
+
+
+From 7ea0f5d37d34434f8a500b51ee01cbd0f421a176 Mon Sep 17 00:00:00 2001
+From: Jordi <jordiag@kth.se>
+Date: Sun, 1 Nov 2026 20:28:10 +0100
+Subject: [PATCH 2/2] Offer TubeBeam in the Cast to TV picker
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The video page's Cast button now lists "TubeBeam · Send to TV" and
+"TubeBeam · Queue on TV" above the discovered FCast receivers when
+TubeBeam is installed and the stream is from YouTube. The button is
+shown whenever TubeBeam can take the video, even if no FCast-compatible
+stream exists. Sending pauses local playback like a cast does.
+---
+ .../org/schabi/newpipe/cast/FCastManager.kt   | 47 +++++++++++++++----
+ .../fragments/detail/VideoDetailFragment.java |  5 +-
+ app/src/main/res/values/donottranslate.xml    |  1 +
+ 3 files changed, 43 insertions(+), 10 deletions(-)
+
+diff --git a/app/src/main/java/org/schabi/newpipe/cast/FCastManager.kt b/app/src/main/java/org/schabi/newpipe/cast/FCastManager.kt
+index 89a922c..2cd9264 100644
+--- a/app/src/main/java/org/schabi/newpipe/cast/FCastManager.kt
++++ b/app/src/main/java/org/schabi/newpipe/cast/FCastManager.kt
+@@ -36,6 +36,7 @@ import org.schabi.newpipe.player.Player
+ import org.schabi.newpipe.util.ListHelper
+ import org.schabi.newpipe.util.StreamTypeUtil
+ import org.schabi.newpipe.util.external_communication.ShareUtils
++import org.schabi.newpipe.util.external_communication.TubeBeamUtils
+ 
+ /** Application-scoped discovery and playback handoff for FCast-compatible TV receivers. */
+ object FCastManager {
+@@ -63,9 +64,13 @@ object FCastManager {
+     @JvmStatic
+     fun canCast(context: Context, info: StreamInfo): Boolean = isAvailable() && selectSource(context, info) != null
+ 
++    /** Whether TubeBeam is installed and can forward this stream to SmartTube on an Android TV. */
++    @JvmStatic
++    fun canSendToTv(context: Context, info: StreamInfo): Boolean = TubeBeamUtils.shouldShowSendToTv(context, info.serviceId)
++
+     @JvmStatic
+     fun showDevicePicker(context: Context, info: StreamInfo, localPlayer: Player?) {
+-        if (!isAvailable()) return
++        if (!isAvailable() && !canSendToTv(context, info)) return
+         val connectedDevice = activeDevice
+         val connectedName = activeDeviceName
+         if (connectedDevice?.isReady() == true && connectedName != null) {
+@@ -76,13 +81,23 @@ object FCastManager {
+     }
+ 
+     private fun showAvailableDevices(context: Context, info: StreamInfo, localPlayer: Player?) {
+-        val source = selectSource(context, info)
+-        if (source == null) {
++        val source = if (isAvailable()) selectSource(context, info) else null
++        // TubeBeam rows are fixed at the top of the list; discovered receivers follow them.
++        val tubeBeamLabels = if (canSendToTv(context, info)) {
++            val appName = context.getString(R.string.tubebeam_app_name)
++            listOf(
++                "$appName · ${context.getString(R.string.send_to_tv_title)}",
++                "$appName · ${context.getString(R.string.queue_on_tv_title)}"
++            )
++        } else {
++            emptyList()
++        }
++        if (source == null && tubeBeamLabels.isEmpty()) {
+             Toast.makeText(context, R.string.cast_no_compatible_stream, Toast.LENGTH_LONG).show()
+             return
+         }
+ 
+-        startDiscovery(context.applicationContext)
++        if (source != null) startDiscovery(context.applicationContext)
+         val availableDevices = mutableListOf<DeviceInfo>()
+         val labels = mutableListOf<String>()
+         val adapter = ArrayAdapter(context, android.R.layout.simple_list_item_1, labels)
+@@ -90,8 +105,12 @@ object FCastManager {
+         val dialog = MaterialAlertDialogBuilder(context)
+             .setTitle(R.string.cast_to_tv)
+             .setAdapter(adapter) { _, position ->
+-                availableDevices.getOrNull(position)?.let {
+-                    connect(context, it, source, createPlaybackHandoff(info, localPlayer))
++                if (position < tubeBeamLabels.size) {
++                    sendToTubeBeam(context, info, localPlayer, enqueue = position == 1)
++                } else if (source != null) {
++                    availableDevices.getOrNull(position - tubeBeamLabels.size)?.let {
++                        connect(context, it, source, createPlaybackHandoff(info, localPlayer))
++                    }
+                 }
+             }
+             .setNeutralButton(R.string.cast_receiver_help) { _, _ ->
+@@ -102,12 +121,13 @@ object FCastManager {
+ 
+         observer = { currentDevices ->
+             availableDevices.clear()
+-            availableDevices.addAll(currentDevices.filter(::isResolved))
++            if (source != null) availableDevices.addAll(currentDevices.filter(::isResolved))
+             labels.clear()
++            labels.addAll(tubeBeamLabels)
+             labels.addAll(availableDevices.map(::deviceLabel))
+             adapter.notifyDataSetChanged()
+             dialog.setTitle(
+-                if (availableDevices.isEmpty()) {
++                if (source != null && availableDevices.isEmpty()) {
+                     R.string.cast_searching
+                 } else {
+                     R.string.cast_to_tv
+@@ -331,6 +351,17 @@ object FCastManager {
+         }
+     }
+ 
++    /**
++     * Hands the stream to TubeBeam, which forwards it to SmartTube on the TV. When the stream is
++     * being played locally and is sent (not queued), local playback is paused like for a cast.
++     */
++    private fun sendToTubeBeam(context: Context, info: StreamInfo, localPlayer: Player?, enqueue: Boolean) {
++        TubeBeamUtils.sendToTv(context, info.url, enqueue)
++        if (!enqueue && localPlayer != null && isSameStream(localPlayer, info) && localPlayer.isPlaying) {
++            localPlayer.pause()
++        }
++    }
++
+     private fun createPlaybackHandoff(info: StreamInfo, player: Player?): PlaybackHandoff? {
+         if (player == null || !isSameStream(player, info)) return null
+ 
+diff --git a/app/src/main/java/org/schabi/newpipe/fragments/detail/VideoDetailFragment.java b/app/src/main/java/org/schabi/newpipe/fragments/detail/VideoDetailFragment.java
+index f90c2a4..f6eeb5e 100644
+--- a/app/src/main/java/org/schabi/newpipe/fragments/detail/VideoDetailFragment.java
++++ b/app/src/main/java/org/schabi/newpipe/fragments/detail/VideoDetailFragment.java
+@@ -2646,8 +2646,9 @@ public final class VideoDetailFragment
+         binding.detailControlsShare.setVisibility(View.VISIBLE);
+         binding.detailControlsOpenInBrowser.setVisibility(View.VISIBLE);
+         binding.detailControlsCast.setVisibility(
+-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+-                        && FCastManager.canCast(requireContext(), info)
++                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
++                        && FCastManager.canCast(requireContext(), info))
++                        || FCastManager.canSendToTv(requireContext(), info)
+                         ? View.VISIBLE : View.GONE);
+         binding.detailControlsPlayWithKodi.setVisibility(
+                 KoreUtils.shouldShowPlayWithKodi(requireContext(), info.getServiceId())
+diff --git a/app/src/main/res/values/donottranslate.xml b/app/src/main/res/values/donottranslate.xml
+index c2eaf22..942a552 100644
+--- a/app/src/main/res/values/donottranslate.xml
++++ b/app/src/main/res/values/donottranslate.xml
+@@ -3,6 +3,7 @@
+     <string name="rss_button_title">RSS</string>
+     <string name="vlc_package">org.videolan.vlc</string>
+     <string name="kore_package">org.xbmc.kore</string>
++    <string name="tubebeam_app_name">TubeBeam</string>
+     <string name="tubebeam_package">dev.tubebeam</string>
+     <string name="tubebeam_send_activity">dev.tubebeam.share.ShareReceiverActivity</string>
+     <string name="tubebeam_queue_activity">dev.tubebeam.share.QueueShareActivity</string>
+-- 
+2.56.0
+
